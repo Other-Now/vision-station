@@ -1,0 +1,34 @@
+@startuml state_station
+!pragma layout smetana
+title Station state machine (checked against src/core/station_fsm.cpp by tests/test_uml_sync.cpp)
+hide empty description
+
+[*] --> Idle
+
+state Active {
+  state Moving
+  state Settling
+  state Acquiring
+  state Processing
+  Moving --> Settling : Arrived
+  Settling --> Acquiring : Settled
+  Acquiring --> Processing : FrameReceived
+}
+
+Idle --> Moving : Start
+Processing --> Idle : ResultReady
+Active --> Error : Timeout / Fault
+Active --> Idle : Stop
+Error --> Idle : Reset
+
+note right of Settling
+  Controller mode: blocks on SETTLE (in-position for 5 ms).
+  "none" mode passes straight through: the frame is
+  exposed while the stage is still ringing.
+end note
+note right of Error
+  Recovery: reconnect stage if dropped,
+  RESET (hold position), re-read POS,
+  then Reset -> Idle and continue the plan.
+end note
+@enduml

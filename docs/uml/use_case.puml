@@ -1,0 +1,39 @@
+@startuml use_case
+!pragma layout smetana
+title vision-station: use cases
+left to right direction
+actor Operator
+actor "Test engineer" as TE
+actor "Recorder process" as REC
+actor "GigE Vision camera" as CAMA
+actor "Stage controller" as STGA
+
+rectangle "vision-station" {
+  usecase "View live image\n+ measurement overlay" as UC1
+  usecase "Adjust camera features\n(exposure, gain, pixel format, trigger)" as UC2
+  usecase "Jog the stage" as UC3
+  usecase "Run inspection plan\n(move, settle, trigger, measure)" as UC4
+  usecase "Recover from error\n(timeout / stage fault)" as UC5
+  usecase "Monitor fps, latency, drops" as UC6
+  usecase "Calibrate camera\n(checkerboard)" as UC7
+  usecase "Record frames\n(shared memory)" as UC8
+  usecase "Benchmark pipeline\n(headless, JSON)" as UC9
+}
+
+Operator --> UC1
+Operator --> UC2
+Operator --> UC3
+Operator --> UC4
+Operator --> UC5
+Operator --> UC6
+TE --> UC7
+TE --> UC9
+UC4 ..> UC5 : <<extend>>
+UC4 ..> UC8 : <<include>>
+REC --> UC8
+UC1 --> CAMA
+UC2 --> CAMA
+UC4 --> CAMA
+UC3 --> STGA
+UC4 --> STGA
+@enduml

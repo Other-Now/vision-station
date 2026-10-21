@@ -1,0 +1,98 @@
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config \
+            libaravis-dev qt6-base-dev libgl-dev libopencv-dev libgtest-dev
+      - name: Build (Release)
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure
+      - name: End-to-end against the fake GigE Vision camera
+        run: bash scripts/e2e.sh build e2e-out
+      - name: Benchmarks (SCHED_FIFO run uses sudo)
+        run: |
+          bash scripts/bench_all.sh build results-ci --sudo
+          cat results-ci/SUMMARY.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-results
+          path: |
+            results-ci
+            e2e-out
+
+  sanitizers:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config \
+            libaravis-dev qt6-base-dev libgl-dev libopencv-dev libgtest-dev
+      - name: Build (ASan + UBSan)
+        run: |
+          cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DVS_SANITIZE=ON
+          cmake --build build-asan
+      - name: Unit tests under ASan/UBSan (leak checking on)
+        run: ctest --test-dir build-asan --output-on-failure
+      - name: End-to-end under ASan/UBSan
+        # GLib/Aravis/Qt keep process-lifetime allocations (type system,
+        # caches) that LeakSanitizer reports; memory errors and UB still fail.
+        env:
+          ASAN_OPTIONS: detect_leaks=0:abort_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: bash scripts/e2e.sh build-asan e2e-asan
+
+  uml:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Render PlantUML (fails on any syntax error)
+        run: |
+          curl -sfL -o plantuml.jar https://github.com/plantuml/plantuml/releases/download/v1.2024.7/plantuml-1.2024.7.jar
+          java -Djava.awt.headless=true -jar plantuml.jar -tsvg -o "$PWD/uml-out" -failfast2 docs/uml/*.puml
+          ls -la uml-out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: uml-svg
+          path: uml-out
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-aravis mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-opencv mingw-w64-ucrt-x86_64-gtest
+      - name: Build (vs_rig and vs_recorder are Linux-only)
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure

@@ -1,0 +1,42 @@
+@startuml sequence_cycle
+title One inspection cycle (Pipeline::acq_inspection_loop)
+autonumber
+participant "Sequencer\n(acquisition thread)" as SEQ
+participant "StageClient" as SC
+participant "vs_rig: stage\n(TCP 5555)" as STG
+participant "AravisCamera" as CAM
+participant "vs_rig: camera\n(GVCP / GVSP)" as GV
+participant "Processing\nthread" as PROC
+participant "GUI thread" as GUI
+participant "vs_recorder\n(shm ring)" as REC
+
+SEQ -> SEQ : fsm.fire(Start)  [Idle -> Moving]
+SEQ -> SC : move(x)
+SC -> STG : MOVE x
+STG --> SC : OK
+SC -> STG : ARRIVE 2000
+STG --> SC : ARRIVED   (trajectory done, still ringing)
+SEQ -> SEQ : fsm.fire(Arrived)  [-> Settling]
+SC -> STG : SETTLE 1000
+STG --> SC : DONE x   (|err| < 2 um for 5 ms)
+SEQ -> SEQ : fsm.fire(Settled)  [-> Acquiring]
+SEQ -> CAM : software_trigger()
+CAM -> GV : GVCP WRITEREG TriggerSoftware
+GV -> GV : next trigger poll slot:\nrender part at stage position,\nstamp truth in row 0
+GV -->> CAM : GVSP leader + payload packets + trailer (UDP)
+SEQ -> CAM : pop(timeout)
+CAM --> SEQ : frame (discard if stamped before trigger)
+SEQ -> SEQ : fsm.fire(FrameReceived)  [-> Processing]
+SEQ -> PROC : BoundedQueue.try_push(job)  (never blocks; drop counted)
+PROC -> PROC : measure_edges() sub-pixel,\nscore vs truth stamp
+PROC -> REC : ShmRing.publish()  (overwrite-oldest, never waits)
+PROC -->> GUI : invokeMethod(QueuedConnection)\nonly if previous result was consumed
+PROC --> SEQ : cycle_done (condvar)
+SEQ -> SEQ : fsm.fire(ResultReady)  [-> Idle]
+
+alt any step times out or the stage faults
+  SEQ -> SEQ : fsm.fire(Timeout | Fault)  [-> Error]
+  SEQ -> SC : reconnect if needed, RESET, POS
+  SEQ -> SEQ : fsm.fire(Reset)  [-> Idle], next cycle
+end
+@enduml

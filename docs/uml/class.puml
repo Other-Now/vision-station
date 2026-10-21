@@ -1,0 +1,88 @@
+@startuml class
+!pragma layout smetana
+title vision-station: main classes
+skinparam classAttributeIconSize 0
+
+package core <<Folder>> {
+  class StationFsm {
+    +fire(Event): bool
+    +state(): State
+    +rejected(): uint64
+  }
+  class "BoundedQueue<T>" as BQ {
+    +try_push(T, evicted*): bool
+    +pop_for(timeout): optional<T>
+    +dropped(): uint64
+  }
+  class StageModel {
+    +move(x, t): bool
+    +position(t): double
+    +settle_time(): double
+    +inject_stall()
+  }
+  class ShmRing {
+    +create(name, slots, bytes)
+    +publish(frame)
+    +read(index): Ok|NotYet|Overrun|Torn
+  }
+  class "measure_edges()" as ME <<function>>
+  class "render_part()" as RP <<function>>
+  class TruthStamp <<struct>>
+  class "calibrate()" as CAL <<function>>
+}
+
+package camera <<Folder>> {
+  class AravisCamera {
+    +open(id)
+    +resolve(candidates): string
+    +set_exposure_us() / set_gain()
+    +set_trigger_software(bool)
+    +software_trigger()
+    +start(StreamOptions) / pop(RawFrame&)
+  }
+}
+
+package pipeline <<Folder>> {
+  class StageClient {
+    +move(x): Status
+    +wait_arrived(ms) / wait_settled(ms)
+    +reset()
+  }
+  class Pipeline {
+    +start_freerun(fps)
+    +start_inspection(InspectionPlan)
+    +snapshot(): Snapshot
+    +latest(): InspectionResult
+    -acq_inspection_loop()
+    -proc_loop()
+    -recover()
+  }
+  class InspectionResult <<struct>>
+}
+
+package apps <<Folder>> {
+  class MainWindow <<Qt>>
+  class LiveView <<QWidget>>
+  class "vs_rig" as RIG <<process>>
+  class "vs_recorder" as RECP <<process>>
+  class "vs_bench" as BENCH <<process>>
+}
+
+Pipeline *-- AravisCamera
+Pipeline *-- StageClient
+Pipeline *-- StationFsm
+Pipeline *-- "2" BQ : proc queue,\nframe pool
+Pipeline o-- ShmRing
+Pipeline ..> ME
+Pipeline ..> TruthStamp
+Pipeline --> InspectionResult
+MainWindow *-- Pipeline
+MainWindow *-- LiveView
+BENCH ..> Pipeline
+RIG ..> StageModel
+RIG ..> RP
+RIG ..> TruthStamp
+RECP ..> ShmRing
+AravisCamera ..> RIG : GVCP/GVSP\n(UDP)
+StageClient ..> RIG : TCP line\nprotocol
+@enduml
