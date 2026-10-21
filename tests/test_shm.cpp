@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include <atomic>
+#include <chrono>
 #include <thread>
 #include <vector>
 
@@ -66,7 +67,10 @@ TEST(ShmRing, ConcurrentReadsAreNeverTorn) {
   });
   std::vector<uint8_t> out(kBytes);
   uint64_t ok = 0, bad = 0, overrun = 0, last = 0;
-  for (int k = 0; k < 200000; ++k) {
+  // Time-bounded, not iteration-bounded: on a loaded box the writer thread
+  // may not have published anything for the first few milliseconds.
+  const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (std::chrono::steady_clock::now() < until && (ok < 20000 || overrun < 100)) {
     const uint64_t pub = r.published();
     if (pub == 0) continue;
     ShmSlotHeader m;
