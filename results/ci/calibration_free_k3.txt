@@ -1,0 +1,6 @@
+board found in 20/20 views; fit on 15, held out 5
+RMS reprojection error: train 0.0755 px, held-out 0.0705 px
+fx 819.67 fy 814.59 cx 323.54 cy 237.88 | k1 -0.2024 k2 -0.0473 p1 0.00078 p2 -0.00044 k3 0.6458
+truth: fx 820.00 fy 815.00 cx 322.50 cy 238.00 k1 -0.2100 k2 0.0900
+errors: fx -0.040%  fy -0.050%  cx +1.04 px  cy -0.12 px
+detected corners vs true projections: mean 0.0623 px, max 0.2873 px

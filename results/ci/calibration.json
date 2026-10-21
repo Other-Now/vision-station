@@ -1,0 +1,1 @@
+{"views":20,"detected":20,"train":15,"holdout":5,"rms_train_px":0.075562,"rms_holdout_px":0.0707216,"fx":819.734,"fy":814.651,"cx":323.609,"cy":237.837,"k1":-0.208735,"k2":0.0761692,"k3":0,"fix_k3":1,"fx_err_pct":-0.0325,"fy_err_pct":-0.0428585,"cx_err_px":1.10912,"cy_err_px":-0.163323,"corner_err_mean_px":0.0623369,"corner_err_max_px":0.287267}
