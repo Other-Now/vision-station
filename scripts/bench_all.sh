@@ -7,7 +7,7 @@ B=${1:?build dir}
 O=${2:?out dir}
 SUDO=${3:-}
 mkdir -p "$O"
-start_rig() {  # start vs_rig and wait until both its camera and stage answer
+start_rig() {  # start vs_rig and wait until its GigE camera answers GVCP
   "$B/vs_rig" >"$1" 2>&1 &
   RIG_PID=$!
   for _ in $(seq 1 50); do
@@ -52,12 +52,15 @@ run inspect --cycles 100 --fit integer --json "$O/inspect_integer.json"
 run inspect --cycles 30 --fault 5:stall --fault 15:drop --fault 25:stall --json "$O/inspect_faults.json"
 
 # 5. Shared-memory recorder: keeping up, and lapped by a slow consumer.
+# (wait on the recorder's pid only: a bare `wait` would also wait for the rig.)
 "$B/vs_recorder" --shm /vs_bench --seconds 9 --json "$O/recorder_fast.json" &
+REC=$!
 run freerun --fps 200 --seconds 8 --shm /vs_bench --json "$O/recorder_fast_station.json"
-wait
+wait "$REC"
 "$B/vs_recorder" --shm /vs_bench --seconds 9 --delay-us 10000 --json "$O/recorder_slow.json" &
+REC=$!
 run freerun --fps 200 --seconds 8 --shm /vs_bench --json "$O/recorder_slow_station.json"
-wait
+wait "$REC"
 
 # 6. Calibration on synthetic checkerboards with known intrinsics.
 "$B/vs_calibrate" --synthetic --views 20 --holdout 5 --json "$O/calibration.json" | tee "$O/calibration.txt"

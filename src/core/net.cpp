@@ -7,7 +7,6 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 using sock_len = int;
-static int last_error() { return WSAGetLastError(); }
 static int poll_fd(SOCKET s, short ev, int ms) {
   WSAPOLLFD p{s, ev, 0};
   return WSAPoll(&p, 1, ms);

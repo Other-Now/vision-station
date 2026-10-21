@@ -7,7 +7,7 @@ set -euo pipefail
 B=${1:?build dir}
 OUT=${2:-$(mktemp -d)}
 mkdir -p "$OUT"
-start_rig() {  # start vs_rig and wait until both its camera and stage answer
+start_rig() {  # start vs_rig and wait until its GigE camera answers GVCP
   "$B/vs_rig" >"$1" 2>&1 &
   RIG_PID=$!
   for _ in $(seq 1 50); do
