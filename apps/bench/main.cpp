@@ -18,6 +18,10 @@
 #include <thread>
 #include <vector>
 
+#ifdef __unix__
+#include <unistd.h>
+#endif
+
 #include "core/rt.hpp"
 #include "pipeline/pipeline.hpp"
 
@@ -30,7 +34,7 @@ struct Args {
   std::string camera = "127.0.0.1";
   int stage_port = 5555;
   double fps = 100, seconds = 5;
-  bool socket_auto = true, rt = false, fifo = true, pin = true;
+  bool socket_auto = true, rt = false, fifo = true, pin = true, packet_socket = false;
   size_t queue = 8;
   int proc_cost_us = 0, stress = 0, cycles = 50, buffers = 16;
   std::string shm, json, settle = "controller", fit = "gaussian";
@@ -88,6 +92,7 @@ PipelineConfig make_cfg(const Args& a) {
   c.proc_queue = a.queue;
   c.stream.socket_buffer_auto = a.socket_auto;
   c.stream.n_buffers = a.buffers;
+  c.stream.packet_socket = a.packet_socket;
   c.rt.enable = a.rt;
   c.rt.fifo = a.fifo;
   c.rt.pin = a.pin;
@@ -95,6 +100,14 @@ PipelineConfig make_cfg(const Args& a) {
   c.shm_name = a.shm;
   c.fit = a.fit == "parabolic" ? PeakFit::Parabolic : a.fit == "integer" ? PeakFit::Integer : PeakFit::Gaussian;
   return c;
+}
+
+bool is_root() {
+#ifdef __unix__
+  return geteuid() == 0;
+#else
+  return false;
+#endif
 }
 
 long read_sysctl(const char* path) {
@@ -165,7 +178,8 @@ int cmd_freerun(const Args& a) {
     << ",\"shm_published\":" << c.shm_published << ",\"pool_alloc\":" << c.pool_alloc
     << ",\"balanced\":" << balanced << ",\"lat_e2e_ms\":" << pjson(e2e) << ",\"lat_transport_ms\":" << pjson(tr)
     << ",\"lat_proc_ms\":" << pjson(pr) << ",\"lat_readout_ms\":" << pjson(ro) << ",\"lat_wire_ms\":" << pjson(wi)
-    << ",\"lat_assembly_ms\":" << pjson(as) << ",\"fifo\":" << (a.rt && a.fifo) << ",\"pin\":" << (a.rt && a.pin)
+    << ",\"lat_assembly_ms\":" << pjson(as) << ",\"fifo\":" << (a.rt && a.fifo) << ",\"pin\":" << (a.rt && a.pin) << ",\"packet_socket\":" << a.packet_socket
+    << ",\"root\":" << is_root()
     << ",\"rmem_default\":" << read_sysctl("/proc/sys/net/core/rmem_default") << "}";
   write_json(a.json, j.str());
   return balanced ? 0 : 1;
@@ -257,6 +271,7 @@ int main(int argc, char** argv) {
     else if (k == "--buffers") a.buffers = std::stoi(v());
     else if (k == "--proc-cost-us") a.proc_cost_us = std::stoi(v());
     else if (k == "--rt") a.rt = true;
+    else if (k == "--packet-socket") a.packet_socket = true;
     else if (k == "--fifo-only") { a.rt = true; a.pin = false; }
     else if (k == "--pin-only") { a.rt = true; a.fifo = false; }
     else if (k == "--stress") a.stress = std::stoi(v());

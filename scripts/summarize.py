@@ -34,9 +34,10 @@ runs = [("gvsp_auto_buffer", "100 fps"), ("overload", "200 fps, 8 ms processing,
         ("overload_q2", "200 fps, 8 ms processing, queue 2 (overload)"),
         ("sched_normal_stress", "200 fps + 4 busy threads, SCHED_OTHER"),
         ("sched_fifo_stress", "200 fps + 4 busy threads, SCHED_FIFO + pinned"),
-        ("sched_fifo_ksoftirqd_stress", "same, ksoftirqd raised to SCHED_FIFO 95"),
         ("sched_fifoonly_stress", "200 fps + 4 busy threads, SCHED_FIFO, not pinned"),
-        ("sched_pinonly_stress", "200 fps + 4 busy threads, pinned, SCHED_OTHER")]
+        ("sched_pinonly_stress", "200 fps + 4 busy threads, pinned, SCHED_OTHER"),
+        ("root_other_udp_socket", "200 fps + 4 busy threads, root, SCHED_OTHER, UDP socket"),
+        ("root_other_packet_socket", "200 fps + 4 busy threads, root, SCHED_OTHER, PF_PACKET ring (Aravis default for root)")]
 for name, label in runs:
     d = j(name)
     if d:

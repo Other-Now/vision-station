@@ -69,18 +69,12 @@ rtrun() {  # name, flags...
     run freerun --fps 200 --seconds 10 --stress 4 "$@" --json "$O/$name.json" || true
   fi
 }
-grep NET_RX /proc/softirqs >"$O/softirq_before_fifo.txt" || true
 rtrun sched_fifo_stress --rt
-grep NET_RX /proc/softirqs >"$O/softirq_after_fifo.txt" || true
-if [ "$SUDO" = "--sudo" ]; then
-  # Hypothesis test: is the extra FIFO median latency packet delivery deferred
-  # to ksoftirqd (SCHED_OTHER)? Raise every ksoftirqd above the station.
-  for p in $(pgrep ksoftirqd); do sudo -n chrt -f -p 95 "$p"; done
-  rtrun sched_fifo_ksoftirqd_stress --rt
-  for p in $(pgrep ksoftirqd); do sudo -n chrt -o -p 0 "$p"; done
-fi
 rtrun sched_fifoonly_stress --fifo-only
 run freerun --fps 200 --seconds 10 --stress 4 --pin-only --json "$O/sched_pinonly_stress.json"
+# Same scheduling (SCHED_OTHER, as root) with Aravis's PF_PACKET receive path on vs off.
+rtrun root_other_udp_socket
+rtrun root_other_packet_socket --packet-socket
 if [ "$SUDO" = "--sudo" ]; then
   cleanup
   start_rig "$O/rig.log"

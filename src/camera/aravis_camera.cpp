@@ -174,6 +174,9 @@ bool AravisCamera::start(const StreamOptions& opt) {
     arv_camera_gv_set_packet_size(cam_, opt.packet_size, gerr(gerror_));
     if (!check("packet size")) return false;
   }
+  if (ARV_IS_GV_DEVICE(arv_camera_get_device(cam_)))
+    arv_camera_gv_set_stream_options(cam_, opt.packet_socket ? ARV_GV_STREAM_OPTION_NONE
+                                                             : ARV_GV_STREAM_OPTION_PACKET_SOCKET_DISABLED);
   on_thread_start_ = opt.on_stream_thread_start;
   stream_ = arv_camera_create_stream(cam_, stream_cb, &on_thread_start_, gerr(gerror_));
   if (!check("create stream")) return false;

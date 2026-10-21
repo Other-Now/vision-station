@@ -30,6 +30,10 @@ struct StreamOptions {
   int n_buffers = 16;
   bool socket_buffer_auto = true;  // size SO_RCVBUF to the payload (see README: GVSP loss)
   int packet_size = 0;             // 0 = leave device default
+  // With CAP_NET_RAW (e.g. root) Aravis silently switches GVSP reception to a
+  // PF_PACKET TPACKET_V3 ring whose blocks retire every 5 ms, which batches
+  // delivery. Off by default so root and non-root runs use the same path.
+  bool packet_socket = false;
   // Called once from Aravis's own GVSP receive thread when it starts, so the
   // caller can apply SCHED_FIFO / pinning to the thread that reads the socket.
   std::function<void()> on_stream_thread_start;
