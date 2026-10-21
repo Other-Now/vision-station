@@ -13,7 +13,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config \
-            libaravis-dev qt6-base-dev libgl-dev libopencv-dev libgtest-dev
+            libaravis-dev libusb-1.0-0-dev libxml2-dev zlib1g-dev qt6-base-dev libgl-dev libopencv-dev libgtest-dev
       - name: Build (Release)
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -42,7 +42,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build pkg-config \
-            libaravis-dev qt6-base-dev libgl-dev libopencv-dev libgtest-dev
+            libaravis-dev libusb-1.0-0-dev libxml2-dev zlib1g-dev qt6-base-dev libgl-dev libopencv-dev libgtest-dev
       - name: Build (ASan + UBSan)
         run: |
           cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DVS_SANITIZE=ON

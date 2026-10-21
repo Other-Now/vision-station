@@ -23,7 +23,13 @@ if(VS_SANITIZE)
 endif()
 
 find_package(Threads REQUIRED)
-find_package(OpenCV REQUIRED COMPONENTS core imgproc calib3d imgcodecs)
+# OpenCV 5 split calib3d into 3d + calib (MSYS2 ships 5.x, Ubuntu 24.04 ships 4.6).
+find_package(OpenCV REQUIRED)
+if(OpenCV_VERSION VERSION_GREATER_EQUAL 5)
+  find_package(OpenCV REQUIRED COMPONENTS core imgproc 3d calib imgcodecs)
+else()
+  find_package(OpenCV REQUIRED COMPONENTS core imgproc calib3d imgcodecs)
+endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(ARAVIS REQUIRED IMPORTED_TARGET aravis-0.8)
 
