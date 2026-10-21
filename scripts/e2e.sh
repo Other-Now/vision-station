@@ -7,11 +7,20 @@ set -euo pipefail
 B=${1:?build dir}
 OUT=${2:-$(mktemp -d)}
 mkdir -p "$OUT"
-cleanup() { pkill -INT -f "$B/vs_rig" 2>/dev/null || true; }
+start_rig() {  # start vs_rig and wait until both its camera and stage answer
+  "$B/vs_rig" >"$1" 2>&1 &
+  RIG_PID=$!
+  for _ in $(seq 1 50); do
+    if "$B/vs_bench" features >/dev/null 2>&1; then return 0; fi
+    sleep 0.2
+  done
+  echo "rig did not come up:"; cat "$1"; return 1
+}
+cleanup() {
+  if [ -n "${RIG_PID:-}" ]; then kill -INT "$RIG_PID" 2>/dev/null || true; wait "$RIG_PID" 2>/dev/null || true; fi
+}
 trap cleanup EXIT
-
-"$B/vs_rig" >"$OUT/rig.log" 2>&1 &
-sleep 1
+start_rig "$OUT/rig.log"
 
 echo "== features"
 "$B/vs_bench" features | tee "$OUT/features.md"
