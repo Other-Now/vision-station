@@ -135,6 +135,7 @@ void fill(ArvBuffer* buffer, void* data, guint32 exposure_us, guint32 /*gain*/, 
   st.right_px_e6 = static_cast<int64_t>(e.right_px * 1e6);
   st.exposure_us = exposure_us;
   st.stage_in_position = inpos ? 1 : 0;
+  st.readout_done_ns = vs::now_ns();
   vs::write_stamp(st, p->data, static_cast<size_t>(w));
   p->received_size = bytes;
   const uint64_t done = vs::now_ns();

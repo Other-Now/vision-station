@@ -48,6 +48,7 @@ struct TruthStamp {
   uint64_t seq = 0;            // rig frame sequence (gap = lost frame)
   uint64_t exposure_start_ns = 0;  // CLOCK_MONOTONIC when exposure began (trigger seen)
   uint64_t fill_ns = 0;            // end of exposure, i.e. start of readout
+  uint64_t readout_done_ns = 0;    // render finished; packets go out right after
   int64_t stage_x_nm = 0;      // mean stage position during exposure
   int64_t left_px_e6 = 0, right_px_e6 = 0;  // true edges of the mean position
   uint32_t exposure_us = 0;

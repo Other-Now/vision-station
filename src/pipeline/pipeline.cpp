@@ -42,8 +42,8 @@ bool Pipeline::connect() {
 
 void Pipeline::apply_rt(const char* who, int cpu) {
   if (!cfg_.rt.enable) return;
-  auto a = rt::set_fifo(cfg_.rt.priority);
-  auto b = rt::pin_to_cpu(cpu);
+  auto a = cfg_.rt.fifo ? rt::set_fifo(cfg_.rt.priority) : rt::Result{true, "no fifo"};
+  auto b = cfg_.rt.pin ? rt::pin_to_cpu(cpu) : rt::Result{true, "no pin"};
   std::lock_guard lk(rt_mu_);
   rt_notes_.push_back(std::string(who) + ": " + a.detail + ", " + b.detail + " -> " + rt::describe_self());
 }
@@ -328,6 +328,11 @@ void Pipeline::proc_loop() {
     if (r.has_truth) {
       lat_e2e_.add(ms(r.truth.fill_ns, r.t_done_ns));
       lat_transport_.add(ms(r.truth.fill_ns, r.t_rx_ns));
+      if (r.truth.readout_done_ns && f.leader_ns) {
+        lat_readout_.add(ms(r.truth.fill_ns, r.truth.readout_done_ns));
+        lat_wire_.add(ms(r.truth.readout_done_ns, f.leader_ns));
+        lat_assembly_.add(ms(f.leader_ns, f.rx_ns));
+      }
       if (r.t_trigger_ns) lat_trigger_.add(ms(r.t_trigger_ns, r.truth.exposure_start_ns));
     }
     lat_proc_.add(ms(r.t_rx_ns, r.t_done_ns));

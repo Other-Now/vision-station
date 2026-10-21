@@ -45,6 +45,7 @@ struct RawFrame {
   uint64_t camera_frame_id = 0;
   uint64_t camera_ts_ns = 0;
   uint64_t rx_ns = 0;  // host monotonic time of pop
+  uint64_t leader_ns = 0;  // host monotonic time the GVSP leader arrived (Aravis rx thread)
   int width = 0, height = 0;
   bool complete = false;  // ARV_BUFFER_STATUS_SUCCESS
   int status = 0;

@@ -205,6 +205,11 @@ bool AravisCamera::pop(RawFrame& out, uint64_t timeout_us) {
   out.complete = out.status == ARV_BUFFER_STATUS_SUCCESS;
   out.camera_frame_id = arv_buffer_get_frame_id(b);
   out.camera_ts_ns = arv_buffer_get_timestamp(b);
+  // Aravis stamps the GVSP leader's arrival with the realtime clock; map it
+  // onto CLOCK_MONOTONIC with the offset between the two clocks right now.
+  const int64_t offset = static_cast<int64_t>(g_get_real_time()) * 1000 - static_cast<int64_t>(now_ns());
+  const uint64_t sys = arv_buffer_get_system_timestamp(b);
+  out.leader_ns = sys ? static_cast<uint64_t>(static_cast<int64_t>(sys) - offset) : 0;
   if (out.complete && arv_buffer_get_payload_type(b) == ARV_BUFFER_PAYLOAD_TYPE_IMAGE) {
     out.width = arv_buffer_get_image_width(b);
     out.height = arv_buffer_get_image_height(b);

@@ -21,6 +21,7 @@ int main(int argc, char** argv) {
   bool synthetic = false;
   std::string dir, save, json;
   int views = 20, holdout = 5;
+  bool fix_k3 = true;
   double noise = 2.0;
   BoardSpec board;
   for (int i = 1; i < argc; ++i) {
@@ -32,6 +33,7 @@ int main(int argc, char** argv) {
     else if (k == "--holdout") holdout = std::stoi(v());
     else if (k == "--noise") noise = std::stod(v());
     else if (k == "--save") save = v();
+    else if (k == "--free-k3") fix_k3 = false;
     else if (k == "--json") json = v();
     else if (k == "--square-mm") board.square_mm = std::stod(v());
     else if (k == "--board") {
@@ -63,7 +65,7 @@ int main(int argc, char** argv) {
     return 2;
   }
 
-  const CalibReport r = calibrate(imgs, board, holdout, synthetic ? &truth_corners : nullptr);
+  const CalibReport r = calibrate(imgs, board, holdout, synthetic ? &truth_corners : nullptr, fix_k3);
   if (!r.ok) {
     std::fprintf(stderr, "calibration failed: board found in %d/%d views\n", r.views_detected, r.views_total);
     return 1;
@@ -79,7 +81,8 @@ int main(int argc, char** argv) {
   j << "{\"views\":" << r.views_total << ",\"detected\":" << r.views_detected << ",\"train\":" << r.views_train
     << ",\"holdout\":" << r.views_holdout << ",\"rms_train_px\":" << r.rms_train_px
     << ",\"rms_holdout_px\":" << r.rms_holdout_px << ",\"fx\":" << K(0, 0) << ",\"fy\":" << K(1, 1)
-    << ",\"cx\":" << K(0, 2) << ",\"cy\":" << K(1, 2) << ",\"k1\":" << D[0] << ",\"k2\":" << D[1];
+    << ",\"cx\":" << K(0, 2) << ",\"cy\":" << K(1, 2) << ",\"k1\":" << D[0] << ",\"k2\":" << D[1]
+    << ",\"k3\":" << D[4] << ",\"fix_k3\":" << fix_k3;
   if (synthetic) {
     std::printf("truth: fx %.2f fy %.2f cx %.2f cy %.2f k1 %.4f k2 %.4f\n", truth.K(0, 0), truth.K(1, 1),
                 truth.K(0, 2), truth.K(1, 2), truth.D[0], truth.D[1]);

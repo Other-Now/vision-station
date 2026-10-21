@@ -32,7 +32,8 @@
 namespace vs {
 
 struct RtConfig {
-  bool enable = false;  // SCHED_FIFO + pinning for rx/acq/proc threads
+  bool enable = false;  // apply fifo and/or pin to the rx/acq/proc threads
+  bool fifo = true, pin = true;
   int priority = 80;
   int cpu_rx = 1, cpu_acq = 2, cpu_proc = 3;
 };
@@ -130,6 +131,11 @@ class Pipeline {
   const LatencyRecorder& lat_proc() const { return lat_proc_; }
   const LatencyRecorder& lat_trigger() const { return lat_trigger_; }
   const LatencyRecorder& lat_cycle() const { return lat_cycle_; }
+  // Transport split: readout (rig render) / wire (rig send -> GVSP leader on
+  // the Aravis thread) / assembly (leader -> our pop, incl. all payload packets).
+  const LatencyRecorder& lat_readout() const { return lat_readout_; }
+  const LatencyRecorder& lat_wire() const { return lat_wire_; }
+  const LatencyRecorder& lat_assembly() const { return lat_assembly_; }
   std::string rt_report() const;
 
   // Invoked on the processing thread at most once per GUI consumption:
@@ -187,6 +193,7 @@ class Pipeline {
   uint64_t last_seq_ = 0;
   Counters c_;
   LatencyRecorder lat_e2e_, lat_transport_, lat_proc_, lat_trigger_, lat_cycle_;
+  LatencyRecorder lat_readout_, lat_wire_, lat_assembly_;
   mutable std::mutex rt_mu_;
   std::vector<std::string> rt_notes_;
   std::string error_;

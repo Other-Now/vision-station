@@ -134,7 +134,7 @@ std::vector<SyntheticView> make_synthetic_views(const BoardSpec& board, const In
 }
 
 CalibReport calibrate(const std::vector<cv::Mat>& images, const BoardSpec& board, int holdout,
-                      const std::vector<std::vector<cv::Point2f>>* truth) {
+                      const std::vector<std::vector<cv::Point2f>>* truth, bool fix_k3) {
   CalibReport r;
   r.views_total = static_cast<int>(images.size());
   const auto obj = board_points(board);
@@ -173,7 +173,7 @@ CalibReport calibrate(const std::vector<cv::Mat>& images, const BoardSpec& board
   std::vector<std::vector<cv::Point2f>> train(found.begin(), found.begin() + r.views_train);
   cv::Mat K, D;
   std::vector<cv::Mat> rv, tv;
-  r.rms_train_px = cv::calibrateCamera(objs, train, sz, K, D, rv, tv);
+  r.rms_train_px = cv::calibrateCamera(objs, train, sz, K, D, rv, tv, fix_k3 ? cv::CALIB_FIX_K3 : 0);
   r.fitted.K = cv::Matx33d(K);
   for (int i = 0; i < 5 && i < D.cols * D.rows; ++i) r.fitted.D[i] = D.at<double>(i);
 

@@ -26,22 +26,39 @@ run() { echo "+ vs_bench $*"; "$B/vs_bench" "$@"; }
 "$B/vs_bench" features >"$O/features.md"
 cat /proc/sys/net/core/rmem_max /proc/sys/net/core/rmem_default >"$O/rmem.txt" || true
 
-# 1. GVSP receive buffer: Aravis default vs SO_RCVBUF sized to the frame.
+# 1. GVSP receive buffer: Aravis default (kernel rmem_default) vs SO_RCVBUF sized to the frame.
+#    The result depends on the host's net.core.rmem_default, so with --sudo it is
+#    also measured at the stock Linux value (212992 B, smaller than one 300 KB frame).
 run freerun --fps 100 --seconds 10 --no-socket-auto --json "$O/gvsp_default_buffer.json" || true
 run freerun --fps 100 --seconds 10 --json "$O/gvsp_auto_buffer.json"
-
-# 2. Overload: processing slower (8 ms) than the camera (200 fps = 5 ms).
-run freerun --fps 200 --seconds 10 --proc-cost-us 8000 --json "$O/overload.json"
-
-# 3. Scheduling under CPU contention (4 busy threads), normal vs SCHED_FIFO + pinning.
-run freerun --fps 200 --seconds 10 --stress 4 --json "$O/sched_normal_stress.json"
 if [ "$SUDO" = "--sudo" ]; then
-  sudo -n env LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}" "$B/vs_bench" freerun --fps 200 --seconds 10 --stress 4 --rt \
-    --json "$O/sched_fifo_stress.json"
-  sudo -n chown "$(id -u)" "$O/sched_fifo_stress.json"
-else
-  run freerun --fps 200 --seconds 10 --stress 4 --rt --json "$O/sched_fifo_stress.json" || true
+  OLD=$(cat /proc/sys/net/core/rmem_default)
+  sudo -n sysctl -qw net.core.rmem_default=212992
+  run freerun --fps 100 --seconds 10 --no-socket-auto --json "$O/gvsp_default_buffer_stock.json" || true
+  run freerun --fps 100 --seconds 10 --json "$O/gvsp_auto_buffer_stock.json"
+  sudo -n sysctl -qw net.core.rmem_default="$OLD"
 fi
+
+# 2. Overload: processing (8 ms) slower than the camera (200 fps = 5 ms).
+#    Queue depth sets the latency of the frames that do get processed.
+run freerun --fps 200 --seconds 10 --proc-cost-us 8000 --json "$O/overload.json"
+run freerun --fps 200 --seconds 10 --proc-cost-us 8000 --queue 2 --json "$O/overload_q2.json"
+
+# 3. Scheduling under CPU contention (4 busy threads): normal, FIFO+pin, FIFO only, pin only.
+run freerun --fps 200 --seconds 10 --stress 4 --json "$O/sched_normal_stress.json"
+rtrun() {  # name, flags...
+  local name=$1; shift
+  if [ "$SUDO" = "--sudo" ]; then
+    sudo -n env LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}" "$B/vs_bench" freerun --fps 200 --seconds 10 --stress 4 "$@" \
+      --json "$O/$name.json"
+    sudo -n chown "$(id -u)" "$O/$name.json"
+  else
+    run freerun --fps 200 --seconds 10 --stress 4 "$@" --json "$O/$name.json" || true
+  fi
+}
+rtrun sched_fifo_stress --rt
+rtrun sched_fifoonly_stress --fifo-only
+run freerun --fps 200 --seconds 10 --stress 4 --pin-only --json "$O/sched_pinonly_stress.json"
 
 # 4. Inspection: settle policy and peak fit, scored against ground truth.
 run inspect --cycles 100 --settle controller --json "$O/inspect_controller.json"
@@ -64,6 +81,7 @@ wait "$REC"
 
 # 6. Calibration on synthetic checkerboards with known intrinsics.
 "$B/vs_calibrate" --synthetic --views 20 --holdout 5 --json "$O/calibration.json" | tee "$O/calibration.txt"
+"$B/vs_calibrate" --synthetic --views 20 --holdout 5 --free-k3 --json "$O/calibration_free_k3.json" | tee "$O/calibration_free_k3.txt"
 
 python3 "$(dirname "$0")/summarize.py" "$O" >"$O/SUMMARY.md"
 cat "$O/SUMMARY.md"

@@ -39,7 +39,10 @@ struct CalibReport {
 };
 
 // The last `holdout` detected views are not used for fitting.
+// fix_k3: hold the 6th-order radial term at 0. With a moderate lens and
+// boards that do not reach the image corners, k2 and k3 are not separately
+// identifiable and trade off against each other while the RMS stays tiny.
 CalibReport calibrate(const std::vector<cv::Mat>& images, const BoardSpec& board, int holdout,
-                      const std::vector<std::vector<cv::Point2f>>* truth_corners = nullptr);
+                      const std::vector<std::vector<cv::Point2f>>* truth_corners = nullptr, bool fix_k3 = true);
 
 }  // namespace vs

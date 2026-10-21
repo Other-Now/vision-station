@@ -30,7 +30,7 @@ struct Args {
   std::string camera = "127.0.0.1";
   int stage_port = 5555;
   double fps = 100, seconds = 5;
-  bool socket_auto = true, rt = false;
+  bool socket_auto = true, rt = false, fifo = true, pin = true;
   size_t queue = 8;
   int proc_cost_us = 0, stress = 0, cycles = 50, buffers = 16;
   std::string shm, json, settle = "controller", fit = "gaussian";
@@ -89,10 +89,18 @@ PipelineConfig make_cfg(const Args& a) {
   c.stream.socket_buffer_auto = a.socket_auto;
   c.stream.n_buffers = a.buffers;
   c.rt.enable = a.rt;
+  c.rt.fifo = a.fifo;
+  c.rt.pin = a.pin;
   c.proc_cost_us = a.proc_cost_us;
   c.shm_name = a.shm;
   c.fit = a.fit == "parabolic" ? PeakFit::Parabolic : a.fit == "integer" ? PeakFit::Integer : PeakFit::Gaussian;
   return c;
+}
+
+long read_sysctl(const char* path) {
+  long v = -1;
+  std::ifstream(path) >> v;
+  return v;
 }
 
 void write_json(const std::string& path, const std::string& body) {
@@ -139,6 +147,10 @@ int cmd_freerun(const Args& a) {
   print_p("exposure end->processed", e2e);
   print_p("exposure end->host rx", tr);
   print_p("rx->processed", pr);
+  const auto ro = p.lat_readout().compute(), wi = p.lat_wire().compute(), as = p.lat_assembly().compute();
+  print_p("  rig readout/render", ro);
+  print_p("  send->GVSP leader", wi);
+  print_p("  leader->pop", as);
   std::printf("  accounting: rx_complete %llu == processed + queue_drops %llu : %s\n", (unsigned long long)in,
               (unsigned long long)out, balanced ? "OK" : "MISMATCH");
   if (a.rt) std::printf("%s", p.rt_report().c_str());
@@ -152,7 +164,9 @@ int cmd_freerun(const Args& a) {
     << ",\"missing_packets\":" << ss.missing_packets << ",\"underruns\":" << ss.underruns
     << ",\"shm_published\":" << c.shm_published << ",\"pool_alloc\":" << c.pool_alloc
     << ",\"balanced\":" << balanced << ",\"lat_e2e_ms\":" << pjson(e2e) << ",\"lat_transport_ms\":" << pjson(tr)
-    << ",\"lat_proc_ms\":" << pjson(pr) << "}";
+    << ",\"lat_proc_ms\":" << pjson(pr) << ",\"lat_readout_ms\":" << pjson(ro) << ",\"lat_wire_ms\":" << pjson(wi)
+    << ",\"lat_assembly_ms\":" << pjson(as) << ",\"fifo\":" << (a.rt && a.fifo) << ",\"pin\":" << (a.rt && a.pin)
+    << ",\"rmem_default\":" << read_sysctl("/proc/sys/net/core/rmem_default") << "}";
   write_json(a.json, j.str());
   return balanced ? 0 : 1;
 }
@@ -243,6 +257,8 @@ int main(int argc, char** argv) {
     else if (k == "--buffers") a.buffers = std::stoi(v());
     else if (k == "--proc-cost-us") a.proc_cost_us = std::stoi(v());
     else if (k == "--rt") a.rt = true;
+    else if (k == "--fifo-only") { a.rt = true; a.pin = false; }
+    else if (k == "--pin-only") { a.rt = true; a.fifo = false; }
     else if (k == "--stress") a.stress = std::stoi(v());
     else if (k == "--shm") a.shm = v();
     else if (k == "--json") a.json = v();
