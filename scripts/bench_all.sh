@@ -7,17 +7,22 @@ B=${1:?build dir}
 O=${2:?out dir}
 SUDO=${3:-}
 mkdir -p "$O"
-start_rig() {  # start vs_rig and wait until its GigE camera answers GVCP
-  "$B/vs_rig" >"$1" 2>&1 &
+start_rig() {  # LOG [PREFIX...]: start vs_rig and wait until its GigE camera answers GVCP
+  local log=$1; shift
+  "$@" "$B/vs_rig" >"$log" 2>&1 &
   RIG_PID=$!
   for _ in $(seq 1 50); do
     if "$B/vs_bench" features >/dev/null 2>&1; then return 0; fi
     sleep 0.2
   done
-  echo "rig did not come up:"; cat "$1"; return 1
+  echo "rig did not come up:"; cat "$log"; return 1
 }
 cleanup() {
-  if [ -n "${RIG_PID:-}" ]; then kill -INT "$RIG_PID" 2>/dev/null || true; wait "$RIG_PID" 2>/dev/null || true; fi
+  if [ -n "${RIG_PID:-}" ]; then
+    kill -INT "$RIG_PID" 2>/dev/null || sudo -n kill -INT "$RIG_PID" 2>/dev/null || true
+    wait "$RIG_PID" 2>/dev/null || true
+    RIG_PID=
+  fi
 }
 trap cleanup EXIT
 start_rig "$O/rig.log"
@@ -45,6 +50,14 @@ run freerun --fps 200 --seconds 10 --proc-cost-us 8000 --json "$O/overload.json"
 run freerun --fps 200 --seconds 10 --proc-cost-us 8000 --queue 2 --json "$O/overload_q2.json"
 
 # 3. Scheduling under CPU contention (4 busy threads): normal, FIFO+pin, FIFO only, pin only.
+#    The rig is the *camera*: on real hardware it would not share our CPUs.
+#    With --sudo it gets CPU 0 at SCHED_FIFO 90 so only the station's
+#    scheduling varies (without that control the starved thread is the
+#    simulator's sender, which no station setting can help).
+if [ "$SUDO" = "--sudo" ]; then
+  cleanup
+  start_rig "$O/rig_rt.log" sudo -n chrt -f 90 taskset -c 0
+fi
 run freerun --fps 200 --seconds 10 --stress 4 --json "$O/sched_normal_stress.json"
 rtrun() {  # name, flags...
   local name=$1; shift
@@ -59,6 +72,10 @@ rtrun() {  # name, flags...
 rtrun sched_fifo_stress --rt
 rtrun sched_fifoonly_stress --fifo-only
 run freerun --fps 200 --seconds 10 --stress 4 --pin-only --json "$O/sched_pinonly_stress.json"
+if [ "$SUDO" = "--sudo" ]; then
+  cleanup
+  start_rig "$O/rig.log"
+fi
 
 # 4. Inspection: settle policy and peak fit, scored against ground truth.
 run inspect --cycles 100 --settle controller --json "$O/inspect_controller.json"
